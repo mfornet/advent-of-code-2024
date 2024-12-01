@@ -1,0 +1,24 @@
+name = "aoc-2024"
+version = "0.1.0"
+defaultTargets = ["aoc-2024"]
+
+[[require]]
+name = "Cli"
+git = "https://github.com/leanprover/lean4-cli.git"
+rev = "main"
+
+[[require]]
+name = "batteries"
+scope = "leanprover-community"
+rev = "main"
+
+[[lean_lib]]
+name = "Aoc2024"
+
+[[lean_exe]]
+name = "aoc-2024"
+root = "Main"
+
+[[lean_exe]]
+name = "day01"
+root = "Aoc2024.Day01"
