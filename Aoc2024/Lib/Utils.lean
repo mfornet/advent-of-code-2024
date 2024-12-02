@@ -1,3 +1,5 @@
+abbrev ℕ := Nat
+
 def lines (s : String) : List String := s.splitOn "\n" |>.reverse |>.dropWhile String.isEmpty |>.reverse
 
 def Prod.tolist {α} (p : α × α) : List α := [p.1, p.2]
@@ -6,7 +8,7 @@ def uncurry (f : α → β → γ) : (α × β → γ) | (a, b) => f a b
 
 namespace IO
 
-def readInput : Nat → IO String
+def readInput : ℕ → IO String
 | 0 => return ""
 | T+1 => do
   let stdin ← IO.getStdin
@@ -22,7 +24,7 @@ def interact (f : String → String) : IO Unit := do
 
 end IO
 
-def absDiff (a b : Nat) : Nat :=
+def absDiff (a b : ℕ) : ℕ :=
   (a - b) + (b - a)
 
 def List.first2! [Inhabited α] : List α → α × α
