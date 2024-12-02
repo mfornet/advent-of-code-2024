@@ -24,17 +24,15 @@ def createState (x₀ x₁ : ℕ) : State :=
   { direction := slopeDirection x₀ x₁, last := x₁, safe := validLevelDifference x₀ x₁ }
 
 def State.step (s : State) (x : ℕ) : State :=
-  { direction := slopeDirection s.last x,
+  { s with
     last := x,
     safe := s.safe && validLevelDifference s.last x && s.direction == slopeDirection s.last x }
 
-def isSafe (report : List ℕ) : Bool := match report with
-  | [] => true
-  | _ :: [] => true
+def isSafe : List ℕ → Bool
   | x :: y :: xs => xs.foldl .step (createState x y) |>.safe
+  | _ => true
 
-def rec (pref suff : List ℕ) : Bool :=
-  match suff with
+def rec (pref : List ℕ) : List ℕ → Bool
   | [] => false
   | x :: xs => isSafe (pref ++ xs) || rec (pref ++ [x]) xs
 
@@ -44,7 +42,7 @@ def isSafe2 (report : List ℕ) : Bool :=
 def solve (filter : List ℕ → Bool) (reports : List (List ℕ)) : ℕ :=
   reports.filter filter |>.length
 
-def main : IO Unit := IO.interact $ λ input =>
+def main : IO Unit := IO.interact $ λ input ↦
   let input := lines input |>.map parseLine
   s!"Part1: {solve isSafe input}\n" ++
   s!"Part2: {solve isSafe2 input}\n"
