@@ -1,19 +1,14 @@
-import Aoc2024.Lib.IO
-import Aoc2024.Lib.Aoc
-import Aoc2024.Lib.List
+import Aoc2024.Lib.Utils
 import Batteries.Data.HashMap.Basic
 
 def parseLine (line : String) : Nat × Nat :=
   line.splitOn "   " |>.map String.toNat! |>.first2!
 
-def absDiff (a b : Nat) : Nat :=
-  if a > b then a - b else b - a
-
 def frequency (l : List Nat) : Batteries.HashMap Nat Nat :=
   l.foldl (λ m n => m.insert n (m.findD n 0 + 1)) Batteries.HashMap.empty
 
 def part1 (l₀ l₁ : List Nat) : Nat :=
-  List.zip l₀ l₁ |>.map (λ ⟨a, b⟩ => absDiff a b) |>.foldl Nat.add 0
+  List.zip l₀ l₁ |>.map (uncurry absDiff) |>.foldl Nat.add 0
 
 def part2 (l₀ l₁ : List Nat) : Nat :=
   let l₁ := frequency l₁
