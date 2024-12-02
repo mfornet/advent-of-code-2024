@@ -31,7 +31,7 @@ def State.step (s : State) (x : ℕ) : State :=
 def isSafe (report : List ℕ) : Bool := match report with
   | [] => true
   | _ :: [] => true
-  | x :: y :: xs => xs.foldl (λ s x => s.step x) (createState x y) |>.safe
+  | x :: y :: xs => xs.foldl .step (createState x y) |>.safe
 
 def rec (pref suff : List ℕ) : Bool :=
   match suff with
