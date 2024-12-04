@@ -1,4 +1,5 @@
 abbrev ℕ := Nat
+abbrev ℤ := Int
 
 def lines (s : String) : List String := s.splitOn "\n" |>.reverse |>.dropWhile String.isEmpty |>.reverse
 
