@@ -31,3 +31,19 @@ def absDiff (a b : ℕ) : ℕ :=
 def List.first2! [Inhabited α] : List α → α × α
 | x :: y :: _ => (x, y)
 | _ => panic "List.first2!: list does not contain 2 elements"
+
+structure Debug (α : Type) where
+  value : α
+  logs : List String
+
+instance : Monad (Debug) where
+  bind x f :=
+    let ⟨value, logs⟩ := f x.value
+    ⟨value, x.logs ++ logs⟩
+  pure x := ⟨x, []⟩
+
+def debug (log : String) : Debug Unit :=
+  Debug.mk () [log]
+
+def ok (value : α) : Debug α :=
+  Debug.mk value []
