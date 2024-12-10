@@ -5,104 +5,99 @@ import Batteries.Data.HashMap.Basic
 structure File where
   id : ℕ
   space : ℕ
-  free : ℕ
-deriving Inhabited
-
-abbrev Disk := List File
-
-def parseInputRec : ℕ → List ℕ → Disk
-  | _, [] => []
-  | id, x :: [] => [ {  id := id, space := x, free := 0 } ]
-  | id, x :: y :: xs => [ { id := id, space := x, free := y } ] ++ parseInputRec (id + 1) xs
-
-def parseInput (input : String) : Disk :=
-  parseInputRec 0 $ input.stripSuffix "\n" |>.toList |>.map (Char.toNat · - Char.toNat '0')
-
-partial def expandAndCompact (disk : Disk) : List ℕ :=
-  match disk with
-  | [] => []
-  | { id := _, space := 0, free := 0} :: xs => expandAndCompact xs
-  | { id := _, space := 0, free := free} :: xs =>
-    match xs.getLast? with
-    | none => []
-    | some last =>
-      if last.space <= free then
-        List.replicate last.space last.id ++ (expandAndCompact $ [{id := last.id, space := 0, free := free - last.space}] ++ xs.dropLast)
-      else
-        List.replicate free last.id ++ (expandAndCompact $ xs.dropLast ++ [{last with space := last.space - free }])
-  | { id := id, space := space, free := free} :: xs => List.replicate space id ++ (expandAndCompact $ [{id := id, space := 0, free := free}] ++ xs)
-
-def checksum (list : List ℕ) : ℕ :=
-  list.enum.map (λ ⟨i, x⟩ => i * x) |>.sum
+deriving Inhabited, Repr
 
 structure Block where
-  files : List File
+  files : Array File
   free : ℕ
+deriving Inhabited, Repr
 
-abbrev Blocks := List Block
+instance : ToString File where
+  toString file := s!"{file.id} {file.space}"
+
+instance : ToString Block where
+  toString block := s!"{block.files} {block.free}"
+
+abbrev Disk := Array Block
+
+def parseInputRec : ℕ → List ℕ → Disk
+  | _, [] => #[]
+  | id, x :: [] => #[Block.mk #[File.mk id x] 0]
+  | id, x :: y :: xs => parseInputRec (id + 1) xs |>.push $ Block.mk #[File.mk id x] y
+
+def parseInput (input : String) : Disk :=
+  parseInputRec 0 (input.stripSuffix "\n" |>.toList |>.map DigitToNat!) |>.reverse
+
+def File.decrease (file : File) (space : ℕ) : File :=
+  { file with space := file.space - space }
+
+def Block.first (block : Block) : File :=
+  block.files.get! 0
+
+def Block.add (block : Block) (file : File) : Block :=
+  { block with files := block.files.push file, free := block.free - file.space }
+
+structure ChecksumState where
+  position : ℕ
+  checksum : ℕ
+
+def ChecksumState.advance (state : ChecksumState) (delta : ℕ) : ChecksumState :=
+  { state with position := state.position + delta }
+
+def ChecksumState.sum (state : ChecksumState) (delta : ℕ) : ℕ :=
+  delta * (delta - 1) / 2 + state.position * delta
+
+def File.checksum (file : File) (state : ChecksumState) : ChecksumState :=
+  ChecksumState.mk (state.position + file.space) (state.checksum + file.id * state.sum file.space)
+
+def Block.checksum (block : Block) (state : ChecksumState) : ChecksumState :=
+  block.files.foldl (λ state file => file.checksum state) state |>.advance block.free
+
+def checksum (disk : Disk) : ℕ :=
+  disk.foldl (λ state block => block.checksum state) (ChecksumState.mk 0 0) |>.checksum
 
 def Block.removeFirstFile (block : Block) : Block :=
-  match block.files with
-  | [] => block
-  | x :: xs => { block with files := [{ x with id := 0 }] ++ xs, free := block.free }
+  { block with files := block.files.modify 0 (λ file => { file with id := 0 }) }
 
-def File.toBlock (file : File) : Block :=
-  { files := [{file with free := 0}], free := file.free }
-
-def Disk.toBlocks (disk : Disk) : Blocks :=
-  disk.map File.toBlock
-
-inductive Result (α : Type)
-  | compacted : α → Result α
-  | same : α → Result α
-
-def Result.map {α β} (f : α → β) : Result α → Result β
-  | Result.compacted x => Result.compacted $ f x
-  | Result.same x => Result.same $ f x
-
-def tryCompactOne (blocks : Blocks) : Result Blocks :=
-  match blocks with
-  | [] => Result.same blocks
-  | x :: xs =>
-    match xs.getLast? with
-    | none => Result.same blocks
-    | some last =>
-      match last.files with
-      | file :: _ =>
-        if file.id > 0 && file.space <= x.free then
-          Result.compacted $ [{ files := x.files ++ [file], free := x.free - file.space }] ++ xs.dropLast ++ [last.removeFirstFile]
+def compact1' (disk : Disk) : Disk :=
+  List.range disk.size |>.reverse.foldl (λ disk i =>
+    let file := disk.back!.first
+    let disk := disk.pop
+    let ⟨disk, file⟩ := List.range i |>.foldl (λ (disk, file) j =>
+      if file.space == 0 then
+        ⟨disk, file⟩
+      else
+        let block := disk.get! j
+        if block.free > 0 then
+          let used := block.free.min file.space
+          let disk := disk.modify j (·.add $ File.mk file.id used)
+          let file := file.decrease used
+          ⟨disk, file⟩
         else
-          tryCompactOne xs |>.map (x :: ·)
-      | _ =>
-          tryCompactOne xs |>.map (x :: ·)
+          ⟨disk, file⟩
+    ) (⟨disk, file⟩ : Disk × File)
 
-partial def Blocks.compactBlocks (blocks : Blocks) : Blocks :=
-  match tryCompactOne blocks with
-  | Result.same blocks => match blocks.getLast? with
-    | none => []
-    | some last => Blocks.compactBlocks blocks.dropLast ++ [last]
-  | Result.compacted blocks => compactBlocks blocks
+    if file.space > 0 then
+      disk.push $ Block.mk #[file] 0
+    else
+      disk
+  ) disk
 
-partial def Blocks.compactBlocksOne (blocks : Blocks) : Blocks :=
-  match tryCompactOne blocks with
-  | Result.same blocks => match blocks.getLast? with
-    | none => []
-    | some last => Blocks.compactBlocksOne blocks.dropLast ++ [last]
-  | Result.compacted blocks => blocks
+def compact2 (disk : Disk) : Disk :=
+  List.range disk.size |>.reverse.foldl (λ disk i =>
+    let required := disk.get! i |>.first.space
+    match List.range i |>.find? (λ j => (disk.get! j |>.free) >= required) with
+    | none => disk
+    | some j =>
+      let file := disk.get! i |>.first
+      let disk := disk.modify i (·.removeFirstFile)
+      disk.modify j (·.add file)
+  ) disk
 
-def Block.expand (block : Block) : List ℕ :=
-  block.files.flatMap (λ file => List.replicate file.space file.id) ++ List.replicate block.free 0
-
-def Blocks.expand (blocks : Blocks) : List ℕ :=
-  blocks.flatMap Block.expand
-
-def solve1 (disk : Disk) : ℕ :=
-  checksum $ expandAndCompact disk
-
-def solve2 (disk : Disk) : ℕ :=
-  checksum $ disk.toBlocks |>.compactBlocks |>.expand
+def solve (disk : Disk) (compact : Disk → Disk) : ℕ :=
+  checksum $ compact disk
 
 def main : IO Unit := IO.interact $ λ input ↦
   let disk := parseInput input
-  s!"Part1: {solve1 disk}\n" ++
-  s!"Part2: {solve2 disk}\n"
+  s!"Part1: {solve disk compact1'}\n" ++
+  s!"Part2: {solve disk compact2}\n"
