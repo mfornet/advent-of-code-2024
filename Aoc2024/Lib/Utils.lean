@@ -47,3 +47,14 @@ def debug (log : String) : Debug Unit :=
 
 def ok (value : α) : Debug α :=
   Debug.mk value []
+
+def DigitToNat (c : Char) : Option ℕ :=
+  if '0' ≤ c ∧ c ≤ '9' then
+    some $ Char.toNat c - Char.toNat '0'
+  else
+    none
+
+def DigitToNat! (c : Char) : ℕ :=
+  match DigitToNat c with
+  | some x => x
+  | none => panic! "DigitToNat!: invalid digit"
