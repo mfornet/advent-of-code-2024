@@ -23,6 +23,11 @@ def readInput : ℕ → IO String
 def interact (f : String → String) : IO Unit := do
   (← readInput 1000000) |> f |> IO.println
 
+def interactM (f : String → IO String) : IO Unit := do
+  let input ← readInput 1000000
+  let output ← f input
+  IO.println output
+
 end IO
 
 def absDiff (a b : ℕ) : ℕ :=
