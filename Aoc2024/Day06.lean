@@ -71,9 +71,6 @@ def Board.simulate (b : Board) : Simulator × Path :=
 def Board.numVisited (b : Board) : ℕ :=
   b.simulate |>.fst |>.visited |>.size
 
-def gridPositions (n m : ℕ) : List (ℕ × ℕ) :=
-  List.range n |>.flatMap (λ i ↦ List.range m |>.map (λ j ↦ (i, j)))
-
 def Board.countStuckInLoopObstacles (b : Board) : ℕ :=
   gridPositions b.shape.1.toNat b.shape.2.toNat
   |>.map (λ p ↦ (Int.ofNat p.1, Int.ofNat p.2))

@@ -37,6 +37,10 @@ def List.first2! [Inhabited α] : List α → α × α
 | x :: y :: _ => (x, y)
 | _ => panic "List.first2!: list does not contain 2 elements"
 
+def List.first3! [Inhabited α] : List α → α × α × α
+| x :: y :: z :: _ => (x, y, z)
+| _ => panic "List.first3!: list does not contain 3 elements"
+
 structure Debug (α : Type) where
   value : α
   logs : List String
@@ -63,3 +67,6 @@ def DigitToNat! (c : Char) : ℕ :=
   match DigitToNat c with
   | some x => x
   | none => panic! "DigitToNat!: invalid digit"
+
+def gridPositions (n m : ℕ) : List (ℕ × ℕ) :=
+  List.range n |>.flatMap (λ i ↦ List.range m |>.map (λ j ↦ (i, j)))
