@@ -70,3 +70,23 @@ def DigitToNat! (c : Char) : ℕ :=
 
 def gridPositions (n m : ℕ) : List (ℕ × ℕ) :=
   List.range n |>.flatMap (λ i ↦ List.range m |>.map (λ j ↦ (i, j)))
+
+def getDigit? (c : Char) : Option ℕ :=
+  if c.isDigit then
+    some (c.toNat - '0'.toNat)
+  else
+    none
+
+def extractNumbers (line : String) : List ℕ :=
+  let (l, d) := line.toList.foldl (λ (l, v) c =>
+    match v, getDigit? c with
+    | some v, some d => (l, some (v * 10 + d))
+    | some v, none => (v :: l, none)
+    | none, d => (l, d)
+  ) (⟨[], none⟩ : List ℕ × Option ℕ)
+
+  let l := match d with
+  | some d => d :: l
+  | none => l
+
+  l.reverse

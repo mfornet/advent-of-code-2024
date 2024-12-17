@@ -15,6 +15,26 @@ deriving Inhabited
 instance : ToString Machine where
   toString m := s!"{m.buttonA} {m.buttonB} {m.prize}"
 
+def getDigit? (c : Char) : Option ℕ :=
+  if c.isDigit then
+    some (c.toNat - '0'.toNat)
+  else
+    none
+
+def extractNumbers (line : String) : List ℕ :=
+  let (l, d) := line.toList.foldl (λ (l, v) c =>
+    match v, getDigit? c with
+    | some v, some d => (l, some (v * 10 + d))
+    | some v, none => (v :: l, none)
+    | none, d => (l, d)
+  ) (⟨[], none⟩ : List ℕ × Option ℕ)
+
+  let l := match d with
+  | some d => d :: l
+  | none => l
+
+  l.reverse
+
 def parseMachine (input : String) : Machine :=
   let (a, b, p) := lines input |>.map extractNumbers |>.map (λ l => l.first2!) |>.first3!
   Machine.mk a b p
