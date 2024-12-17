@@ -1,3 +1,5 @@
+import Std.Data.HashSet.Basic
+
 abbrev ℕ := Nat
 abbrev ℤ := Int
 
@@ -90,3 +92,6 @@ def extractNumbers (line : String) : List ℕ :=
   | none => l
 
   l.reverse
+
+def List.toHashSet {α : Type} [BEq α] [Hashable α] (l : List α) : Std.HashSet α :=
+  l.foldl (λ set x => set.insert x) ∅

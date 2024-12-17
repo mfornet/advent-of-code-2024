@@ -2,79 +2,167 @@ import Aoc2024.Lib.Utils
 import Std.Data.HashSet.Basic
 import Batteries.Data.HashMap.Basic
 
-abbrev PairN := ℕ × ℕ
+structure Board where
+  boxes: Std.HashSet (ℤ × ℤ)
+  walls: Std.HashSet (ℤ × ℤ)
+  position: ℤ × ℤ
 
-instance : Inhabited PairN := ⟨(0, 0)⟩
+instance : ToString Board where
+  toString board := s!"boxes: {board.boxes.toList}\nposition: {board.position}"
 
-structure Machine where
-  buttonA : PairN
-  buttonB : PairN
-  prize : PairN
+inductive Step where
+  | up
+  | down
+  | left
+  | right
 deriving Inhabited
 
-instance : ToString Machine where
-  toString m := s!"{m.buttonA} {m.buttonB} {m.prize}"
+instance : ToString Step where
+  toString
+    | Step.up => "up"
+    | Step.down => "down"
+    | Step.left => "left"
+    | Step.right => "right"
 
-def getDigit? (c : Char) : Option ℕ :=
-  if c.isDigit then
-    some (c.toNat - '0'.toNat)
+def parseBoard (input : String) : Board :=
+  lines input |>.enum |>.foldl (λ board (row, line) =>
+    line.toList |>.enum |>.foldl (λ board (col, c) =>
+      match c with
+      | '#' => { board with walls := board.walls.insert ⟨row, col⟩ }
+      | 'O' => { board with boxes := board.boxes.insert ⟨row, col⟩ }
+      | '@' => { board with position := ⟨row, col⟩ }
+      | _ => board
+    ) board
+  ) (Board.mk ∅ ∅ ⟨0, 0⟩)
+
+def parseInput (input : String) : Board × (List Step) :=
+  let (board, moves) := input.splitOn "\n\n" |>.first2!
+  let moves := moves.replace "\n" "" |>.toList |>.map (λ c => match c with
+    | '^' => Step.up
+    | 'v' => Step.down
+    | '<' => Step.left
+    | '>' => Step.right
+    | _ => panic! s!"parseInput: {c}"
+  )
+  ⟨parseBoard board, moves⟩
+
+def Step.direction (step : Step) : ℤ × ℤ :=
+  match step with
+  | Step.up => ⟨-1, 0⟩
+  | Step.down => ⟨1, 0⟩
+  | Step.left => ⟨0, -1⟩
+  | Step.right => ⟨0, 1⟩
+
+def Board.step (board : Board) (step : Step) : Board := Id.run do
+  let (dx, dy) := step.direction
+  let (px, py) := board.position
+  let mut x := px + dx
+  let mut y := py + dy
+  let mut board := board
+
+  while true do
+    if board.walls.contains ⟨x, y⟩ then
+      break
+
+    if !board.boxes.contains ⟨x, y⟩ then
+      let nx := px + dx
+      let ny := py + dy
+
+      board := { board with position := ⟨nx, ny⟩ }
+      board := { board with boxes := board.boxes.insert ⟨x, y⟩ }
+      board := { board with boxes := board.boxes.erase ⟨nx, ny⟩ }
+
+      break
+
+    x := x + dx
+    y := y + dy
+
+  return board
+
+def Board.eval (board : Board) : ℕ :=
+  board.boxes.toList.map (λ (x, y) => 100 * Int.toNat x + Int.toNat y) |>.sum
+
+def Board.isBox (board : Board) (x y : ℤ) : Bool :=
+  board.boxes.contains ⟨x, y⟩ || board.boxes.contains ⟨x, y - 1⟩
+
+def Board.getBoxOther (board : Board) (x y : ℤ) : ℤ × ℤ :=
+  if board.boxes.contains ⟨x, y⟩ then
+    (x, y + 1)
   else
-    none
+    (x, y - 1)
 
-def extractNumbers (line : String) : List ℕ :=
-  let (l, d) := line.toList.foldl (λ (l, v) c =>
-    match v, getDigit? c with
-    | some v, some d => (l, some (v * 10 + d))
-    | some v, none => (v :: l, none)
-    | none, d => (l, d)
-  ) (⟨[], none⟩ : List ℕ × Option ℕ)
+def Board.shape (board : Board) : ℕ × ℕ :=
+  let (x, y) := board.walls.toList |>.foldl (λ (max_x, max_y) (x, y) => (x.toNat.max max_x, y.toNat.max max_y)) (0, 0)
+  ⟨x + 1, y + 1⟩
 
-  let l := match d with
-  | some d => d :: l
-  | none => l
+def updateMap (map : Array (Array Char)) (p : ℤ × ℤ) (v : Char) : Array (Array Char) :=
+  let x := Int.toNat p.1
+  let y := Int.toNat p.2
+  map.modify x (λ row => row.modify y (λ _ => v))
 
-  l.reverse
+def Board.toMap2 (board : Board) : Array (Array Char) :=
+  let (n, m) := board.shape
+  let map := Array.mkArray n (Array.mkArray m '.')
+  let map := updateMap map board.position '@'
+  let map := board.walls.toList.foldl (λ map (x, y) => updateMap map (x, y) '#') map
+  let map := board.boxes.toList.foldl (λ map (x, y) => updateMap map (x, y) '[') map
+  let map := board.boxes.toList.foldl (λ map (x, y) => updateMap map (x, y + 1) ']') map
+  map
 
-def parseMachine (input : String) : Machine :=
-  let (a, b, p) := lines input |>.map extractNumbers |>.map (λ l => l.first2!) |>.first3!
-  Machine.mk a b p
+def Board.toPrettyString (board : Board) : String :=
+  String.join $ board.toMap2.toList.map (λ row => String.join $ row.toList.map (λ c => c.toString)) |>.map (λ row => row ++ "\n")
 
-def parseInput (input : String) : List Machine :=
-  input.splitOn "\n\n" |>.map parseMachine
+def Board.step2 (board : Board) (step : Step) : Board := Id.run do
+  let (dx, dy) := step.direction
+  let mut active := #[board.position]
+  let mut seen : Std.HashSet (ℤ × ℤ) := { board.position }
+  let mut ok := true
+  let mut board := board
 
-def Machine.find? (m : Machine) : IO (Option ℕ) := do
-  let a := Int.ofNat m.buttonA.1
-  let b := Int.ofNat m.buttonB.1
-  let u := Int.ofNat m.prize.1
-  let c := Int.ofNat m.buttonA.2
-  let d := Int.ofNat m.buttonB.2
-  let v := Int.ofNat m.prize.2
+  while ok && !active.isEmpty do
+    let (x, y) := active.back!
+    -- dbg_trace s!"x={x} y={y}"
+    active := active.pop
 
-  if u % b == 0 && v % d == 0 && u / b == v / d then
-    return some (u / b).toNat
-  else
-    let det := a * d - b * c
-    if det == 0 then
-      return none
-    else
-      let san := d * u - b * v
-      let sbn := -c * u + a * v
+    let (nx, ny) := (x + dx, y + dy)
 
-      if san * det >= 0 && san % det.natAbs == 0 && sbn * det >= 0 && sbn % det.natAbs == 0 then
-        let san := san / det
-        let sbn := sbn / det
-        return some (san * 3 + sbn).toNat
-      else
-        return none
+    if board.walls.contains ⟨nx, ny⟩ then
+      ok := false
+      break
 
-def Machine.adjustPrice (m : Machine) (extra : ℕ) : Machine :=
-  Machine.mk (m.buttonA) (m.buttonB) (m.prize.1 + extra, m.prize.2 + extra)
+    if board.isBox nx ny then
+      if !seen.contains (nx, ny) then
+        seen := seen.insert (nx, ny)
+        active := active.push (nx, ny)
 
-def solve (machines : List Machine) (extra : ℕ ): IO ℕ := do
-  let ls ← machines.map (·.adjustPrice extra) |>.filterMapM (λ m => m.find?)
-  return ls.sum
+        let (ox, oy) := board.getBoxOther nx ny
 
-def main : IO Unit := IO.interactM $ λ input ↦ do
-  let machines := parseInput input
-  return s!"Part1: {← solve machines 0}\n" ++
-  s!"Part2: {← solve machines 10000000000000}\n"
+        seen := seen.insert (ox, oy)
+        active := active.push (ox, oy)
+
+  -- dbg_trace s!"ok={ok}"
+  if ok then
+    let (px, py) := board.position
+    let changed := board.boxes.toList.filter (λ (x, y) => seen.contains (x, y))
+    let boxes := changed.foldl (λ set p => set.erase p) board.boxes
+    let boxes := changed.foldl (λ set (x, y) => set.insert (x + dx, y + dy)) boxes
+    board := { board with position := ⟨px + dx, py + dy⟩, boxes := boxes }
+
+  -- dbg_trace s!"{step}"
+  -- dbg_trace s!"{board.toPrettyString}\n\n"
+  return board
+
+def solve (board : Board) (steps : List Step) (step_f : Board → Step → Board) : ℕ :=
+  steps.foldl step_f board |>.eval
+
+def Board.toBoard2 (board : Board) : Board :=
+  {
+    position := ⟨board.position.1, board.position.2 * 2⟩
+    boxes := board.boxes.toList.map (λ (x, y) => ⟨x, y * 2⟩) |>.toHashSet
+    walls := board.walls.toList.flatMap (λ (x, y) => [⟨x, y * 2⟩, ⟨x, y * 2 + 1⟩]) |>.toHashSet
+  }
+
+def main : IO Unit := IO.interact $ λ input ↦
+  let (board, steps) := parseInput input
+  s!"Part1: {solve board steps Board.step}\n" ++
+  s!"Part2: {solve board.toBoard2 steps Board.step2}\n"
