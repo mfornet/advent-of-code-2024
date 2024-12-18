@@ -95,3 +95,5 @@ def extractNumbers (line : String) : List ℕ :=
 
 def List.toHashSet {α : Type} [BEq α] [Hashable α] (l : List α) : Std.HashSet α :=
   l.foldl (λ set x => set.insert x) ∅
+
+def Int.max (a b : Int) : Int := if a > b then a else b
