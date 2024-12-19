@@ -90,3 +90,7 @@ root = "Aoc2024.Day17"
 [[lean_exe]]
 name = "day18"
 root = "Aoc2024.Day18"
+
+[[lean_exe]]
+name = "day19"
+root = "Aoc2024.Day19"
